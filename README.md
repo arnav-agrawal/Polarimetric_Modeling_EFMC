@@ -11,6 +11,7 @@ With this background in mind, the high level overview of the program is as follo
 And this is how to run the program:
 - Compile run_electric_field_mc.cu
     - `nvcc run_electric_field_mc.cu -o "YOUR_EXECUTABLE_NAME_HERE"`
+    - You may get some warnings about unused functions, that is fine.
 - Run the executable that was just created with flags for the total number of photons to Monte Carlo, the number of photons per batch, the random seed for the MC, and the number of photon records allocated in memory per photon
     - `./"YOUR_EXECUTABLE_NAME_HERE" 50000000 1000000 123456789 3`
     - Recommended to use at least 50 million photons (first argument), 500 thousand photons per batch (second argument), and 3-5 photon records per photon (less than 3 will throw an error)
