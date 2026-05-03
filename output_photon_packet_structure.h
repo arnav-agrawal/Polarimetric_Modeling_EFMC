@@ -5,7 +5,6 @@
  * Both the GPU transport code and any later post-processing code must include
  * this header so they agree on the exact byte layout written to disk.
  *
- * Float version: this layout matches run_electric_field_mc_float.cu.
  */
 
 #ifndef EFMC_PACKET_LAYOUT_H
