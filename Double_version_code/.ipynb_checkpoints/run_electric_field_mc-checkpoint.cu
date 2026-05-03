@@ -52,27 +52,27 @@
 namespace {
 
 constexpr int ANGLES = 181;
-constexpr float PI = 3.141592653589793238462643383279502884f;
-constexpr float RANGE_DEG = 10.0f;
-constexpr float ANGLEI_DEG = 0.0f;
-constexpr float LAMBDA = 0.126f;
+constexpr double PI = 3.141592653589793238462643383279502884;
+constexpr double RANGE_DEG = 10.0;
+constexpr double ANGLEI_DEG = 0.0;
+constexpr double LAMBDA = 0.126;
 constexpr int THREADS_PER_BLOCK = 256;
 constexpr int MAX_SCATTER = 200000;
 
 // Physics parameters from the CPU code, with the ZMAX_l1 typo fixed.
-constexpr float QXX_l1 = 127.0105178f;
-constexpr float SCOEFF_l1 = 1.899049e0f;
-constexpr float SSA_l1 = 0.99f;
-constexpr float NMED_l1 = 1.6432f;
-constexpr float ZMAX_l1 = 18.99049f / SCOEFF_l1;
+constexpr double QXX_l1 = 127.0105178;
+constexpr double SCOEFF_l1 = 1.899049e0;
+constexpr double SSA_l1 = 0.99;
+constexpr double NMED_l1 = 1.6432;
+constexpr double ZMAX_l1 = 18.99049 / SCOEFF_l1;
 
-constexpr float QXX_l2 = 127.0105178f;
-constexpr float SCOEFF_l2 = 1.899049e0f;
-constexpr float SSA_l2 = 0.99f;
-constexpr float NMED_l2 = 1.6432f;
-constexpr float ZMAX_l2 = 18.99049f / SCOEFF_l2;
+constexpr double QXX_l2 = 127.0105178;
+constexpr double SCOEFF_l2 = 1.899049e0;
+constexpr double SSA_l2 = 0.99;
+constexpr double NMED_l2 = 1.6432;
+constexpr double ZMAX_l2 = 18.99049 / SCOEFF_l2;
 
-constexpr float ZMAX_total = ZMAX_l1 + ZMAX_l2;
+constexpr double ZMAX_total = ZMAX_l1 + ZMAX_l2;
 
 const char *INPUT_L1 = "./Inputs/S1S2_Case3_rock_in_regolith_12_pct.dat";
 const char *INPUT_L2 = "./Inputs/S1S2_Case3_rock_in_regolith_12_pct.dat";
@@ -88,17 +88,17 @@ constexpr std::uint64_t DEFAULT_RECORDS_PER_PHOTON = 4ULL;
  * languages.
  */
 struct Complex2 {
-    float re;
-    float im;
+    double re;
+    double im;
 };
 
 /**
  * @brief Lightweight 3-vector used for basis vectors, directions, and positions.
  */
 struct Vec3 {
-    float x;
-    float y;
-    float z;
+    double x;
+    double y;
+    double z;
 };
 
 /**
@@ -117,21 +117,21 @@ struct Vec3 {
  * field order and type layout.
  */
 struct PacketOut {
-    float etheta;
-    float pl_l1;
-    float pl_l2;
-    float pexit;
-    float phase;
+    double etheta;
+    double pl_l1;
+    double pl_l2;
+    double pexit;
+    double phase;
     int nscatt;
     int _pad;
     Complex2 Efe[2];
     Complex2 Ere[2];
-    float mef[3];
-    float nef[3];
-    float sef[3];
-    float mer[3];
-    float ner[3];
-    float ser[3];
+    double mef[3];
+    double nef[3];
+    double sef[3];
+    double mer[3];
+    double ner[3];
+    double ser[3];
 };
 
 /**
@@ -142,10 +142,10 @@ struct PacketOut {
  * `cdf` is the cumulative distribution used to sample scattering angle alpha.
  */
 struct HostScatteringTable {
-    std::vector<float> sca_deg;
+    std::vector<double> sca_deg;
     std::vector<Complex2> s1;
     std::vector<Complex2> s2;
-    std::vector<float> cdf;
+    std::vector<double> cdf;
 };
 
 /**
@@ -154,10 +154,10 @@ struct HostScatteringTable {
 struct DeviceTables {
     Complex2 *s1_l1 = nullptr;
     Complex2 *s2_l1 = nullptr;
-    float *cdf_l1 = nullptr;
+    double *cdf_l1 = nullptr;
     Complex2 *s1_l2 = nullptr;
     Complex2 *s2_l2 = nullptr;
-    float *cdf_l2 = nullptr;
+    double *cdf_l2 = nullptr;
 };
 
 #define CUDA_CHECK(stmt)                                                       \
@@ -173,7 +173,7 @@ struct DeviceTables {
 /**
  * @brief Construct a Complex2 value.
  */
-__host__ __device__ inline Complex2 c_make(float re, float im) {
+__host__ __device__ inline Complex2 c_make(double re, double im) {
     Complex2 z{re, im};
     return z;
 }
@@ -194,7 +194,7 @@ __host__ __device__ inline Complex2 c_mul(Complex2 a, Complex2 b) {
 }
 
 /** @brief Multiply a complex number by a real scalar. */
-__host__ __device__ inline Complex2 c_scale(Complex2 a, float s) {
+__host__ __device__ inline Complex2 c_scale(Complex2 a, double s) {
     return c_make(a.re * s, a.im * s);
 }
 
@@ -204,7 +204,7 @@ __host__ __device__ inline Complex2 c_conj(Complex2 a) {
 }
 
 /** @brief Squared magnitude |z|^2. */
-__host__ __device__ inline float c_abs2(Complex2 a) {
+__host__ __device__ inline double c_abs2(Complex2 a) {
     return a.re * a.re + a.im * a.im;
 }
 
@@ -215,33 +215,33 @@ __host__ __device__ inline float c_abs2(Complex2 a) {
  * field. The current first-stage transport stores the phase difference in the
  * packet and leaves the coherent summation to a later stage.
  */
-__host__ __device__ inline Complex2 c_exp_i(float phase) {
-    return c_make(cosf(phase), sinf(phase));
+__host__ __device__ inline Complex2 c_exp_i(double phase) {
+    return c_make(cos(phase), sin(phase));
 }
 
-/** @brief Clamp a float to [lo, hi]. */
-__host__ __device__ inline float clampd(float x, float lo, float hi) {
+/** @brief Clamp a double to [lo, hi]. */
+__host__ __device__ inline double clampd(double x, double lo, double hi) {
     return (x < lo) ? lo : ((x > hi) ? hi : x);
 }
 
 /** @brief Construct a Vec3. */
-__host__ __device__ inline Vec3 v_make(float x, float y, float z) {
+__host__ __device__ inline Vec3 v_make(double x, double y, double z) {
     Vec3 v{x, y, z};
     return v;
 }
 
 /** @brief Euclidean dot product. */
-__host__ __device__ inline float dot3(const Vec3 &a, const Vec3 &b) {
+__host__ __device__ inline double dot3(const Vec3 &a, const Vec3 &b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 /** @brief Euclidean vector norm. */
-__host__ __device__ inline float norm3(const Vec3 &a) {
-    return sqrtf(dot3(a, a));
+__host__ __device__ inline double norm3(const Vec3 &a) {
+    return sqrt(dot3(a, a));
 }
 
 /** @brief Scale a vector by a real scalar. */
-__host__ __device__ inline Vec3 v_scale(const Vec3 &a, float s) {
+__host__ __device__ inline Vec3 v_scale(const Vec3 &a, double s) {
     return v_make(a.x * s, a.y * s, a.z * s);
 }
 
@@ -261,11 +261,11 @@ __host__ __device__ inline Vec3 v_sub(const Vec3 &a, const Vec3 &b) {
  * Returns the zero vector unchanged if the input norm is zero.
  */
 __host__ __device__ inline Vec3 normalize3(const Vec3 &a) {
-    float n = norm3(a);
-    if (n == 0.0f) {
-        return v_make(0.0f, 0.0f, 0.0f);
+    double n = norm3(a);
+    if (n == 0.0) {
+        return v_make(0.0, 0.0, 0.0);
     }
-    return v_scale(a, 1.0f / n);
+    return v_scale(a, 1.0 / n);
 }
 
 /**
@@ -284,7 +284,7 @@ __device__ inline void matrix_multiply_2x2(const Complex2 first[4],
                                            Complex2 product[4]) {
     for (int c = 0; c < 2; ++c) {
         for (int d = 0; d < 2; ++d) {
-            Complex2 sum = c_make(0.0f, 0.0f);
+            Complex2 sum = c_make(0.0, 0.0);
             for (int k = 0; k < 2; ++k) {
                 sum = c_add(sum, c_mul(first[c * 2 + k], second[k * 2 + d]));
             }
@@ -300,22 +300,22 @@ __device__ inline void matrix_multiply_2x2(const Complex2 first[4],
  * direction and m/n span the transverse polarization plane. These formulas are used after each sampled scatter.
  */
 __device__ inline void rotate_ref_frame(Vec3 &m, Vec3 &n, Vec3 &s,
-                                        float theta, float phi) {
+                                        double theta, double phi) {
     Vec3 mrot;
     Vec3 nrot;
     Vec3 srot;
 
-    mrot.x = cosf(theta) * cosf(phi) * m.x + cosf(theta) * sinf(phi) * n.x - sinf(theta) * s.x;
-    mrot.y = cosf(theta) * cosf(phi) * m.y + cosf(theta) * sinf(phi) * n.y - sinf(theta) * s.y;
-    mrot.z = cosf(theta) * cosf(phi) * m.z + cosf(theta) * sinf(phi) * n.z - sinf(theta) * s.z;
+    mrot.x = cos(theta) * cos(phi) * m.x + cos(theta) * sin(phi) * n.x - sin(theta) * s.x;
+    mrot.y = cos(theta) * cos(phi) * m.y + cos(theta) * sin(phi) * n.y - sin(theta) * s.y;
+    mrot.z = cos(theta) * cos(phi) * m.z + cos(theta) * sin(phi) * n.z - sin(theta) * s.z;
 
-    nrot.x = -sinf(phi) * m.x + cosf(phi) * n.x;
-    nrot.y = -sinf(phi) * m.y + cosf(phi) * n.y;
-    nrot.z = -sinf(phi) * m.z + cosf(phi) * n.z;
+    nrot.x = -sin(phi) * m.x + cos(phi) * n.x;
+    nrot.y = -sin(phi) * m.y + cos(phi) * n.y;
+    nrot.z = -sin(phi) * m.z + cos(phi) * n.z;
 
-    srot.x = sinf(theta) * cosf(phi) * m.x + sinf(theta) * sinf(phi) * n.x + cosf(theta) * s.x;
-    srot.y = sinf(theta) * cosf(phi) * m.y + sinf(theta) * sinf(phi) * n.y + cosf(theta) * s.y;
-    srot.z = sinf(theta) * cosf(phi) * m.z + sinf(theta) * sinf(phi) * n.z + cosf(theta) * s.z;
+    srot.x = sin(theta) * cos(phi) * m.x + sin(theta) * sin(phi) * n.x + cos(theta) * s.x;
+    srot.y = sin(theta) * cos(phi) * m.y + sin(theta) * sin(phi) * n.y + cos(theta) * s.y;
+    srot.z = sin(theta) * cos(phi) * m.z + sin(theta) * sin(phi) * n.z + cos(theta) * s.z;
 
     m = mrot;
     n = nrot;
@@ -325,17 +325,17 @@ __device__ inline void rotate_ref_frame(Vec3 &m, Vec3 &n, Vec3 &s,
 /**
  * @brief Rotate vector v about axis k by angle theta using Rodrigues' formula.
  */
-__device__ inline void rodrigues(const Vec3 &k, float theta, Vec3 &v) {
-    float s = sinf(theta);
-    float c = cosf(theta);
-    float n = 1.0f - c;
+__device__ inline void rodrigues(const Vec3 &k, double theta, Vec3 &v) {
+    double s = sin(theta);
+    double c = cos(theta);
+    double n = 1.0 - c;
 
-    float vx = v.x;
-    float vy = v.y;
-    float vz = v.z;
-    float kx = k.x;
-    float ky = k.y;
-    float kz = k.z;
+    double vx = v.x;
+    double vy = v.y;
+    double vz = v.z;
+    double kx = k.x;
+    double ky = k.y;
+    double kz = k.z;
 
     v.x = (kx * kx * n + c) * vx + (ky * kx * n - kz * s) * vy + (kz * kx * n + ky * s) * vz;
     v.y = (kx * ky * n + kz * s) * vx + (ky * ky * n + c) * vy + (ky * kz * n - kx * s) * vz;
@@ -348,7 +348,7 @@ __device__ inline void rodrigues(const Vec3 &k, float theta, Vec3 &v) {
  * Returns the lower bin index i such that rr lies in [cdf[i], cdf[i+1]).
  * The later interpolation step converts this into a continuous scattering angle.
  */
-__device__ inline int find_alpha_bin(float rr, const float *cdf) {
+__device__ inline int find_alpha_bin(double rr, const double *cdf) {
     int lo = 0;
     int hi = ANGLES - 1;
     while (lo + 1 < hi) {
@@ -371,16 +371,16 @@ __device__ inline int find_alpha_bin(float rr, const float *cdf) {
  * @param s1      Output interpolated S1(alpha).
  * @param s2      Output interpolated S2(alpha).
  */
-__device__ inline void interp_s1s2(float alpha,
+__device__ inline void interp_s1s2(double alpha,
                                    const Complex2 *s1_tab,
                                    const Complex2 *s2_tab,
                                    Complex2 &s1,
                                    Complex2 &s2) {
-    float alpha_deg = alpha * 180.0f / PI;
-    int i = static_cast<int>(floorf(alpha_deg));
+    double alpha_deg = alpha * 180.0 / PI;
+    int i = static_cast<int>(floor(alpha_deg));
     if (i < 0) i = 0;
     if (i > ANGLES - 2) i = ANGLES - 2;
-    float f = alpha_deg - static_cast<float>(i);
+    double f = alpha_deg - static_cast<double>(i);
     s1 = c_add(s1_tab[i], c_scale(c_sub(s1_tab[i + 1], s1_tab[i]), f));
     s2 = c_add(s2_tab[i], c_scale(c_sub(s2_tab[i + 1], s2_tab[i]), f));
 }
@@ -391,19 +391,19 @@ __device__ inline void interp_s1s2(float alpha,
  * The current model uses two homogeneous layers stacked along +z. The active
  * layer is determined solely from the photon's current z coordinate.
  */
-__device__ inline void select_layer_tables(float z,
+__device__ inline void select_layer_tables(double z,
                                            const Complex2 *s1_l1,
                                            const Complex2 *s2_l1,
-                                           const float *cdf_l1,
+                                           const double *cdf_l1,
                                            const Complex2 *s1_l2,
                                            const Complex2 *s2_l2,
-                                           const float *cdf_l2,
+                                           const double *cdf_l2,
                                            const Complex2 *&s1,
                                            const Complex2 *&s2,
-                                           const float *&cdf,
-                                           float &scoeff,
-                                           float &ssa,
-                                           float &nmed) {
+                                           const double *&cdf,
+                                           double &scoeff,
+                                           double &ssa,
+                                           double &nmed) {
     if (z < ZMAX_l1) {
         s1 = s1_l1;
         s2 = s2_l1;
@@ -428,9 +428,9 @@ __device__ inline void select_layer_tables(float z,
  * into the post-scatter basis defined by the sampled azimuth beta.
  */
 __device__ inline void jones_from_s1s2(Complex2 s1, Complex2 s2,
-                                       float beta, Complex2 M[4]) {
-    float cb = cosf(beta);
-    float sb = sinf(beta);
+                                       double beta, Complex2 M[4]) {
+    double cb = cos(beta);
+    double sb = sin(beta);
     M[0] = c_scale(s2, cb);
     M[1] = c_scale(s2, sb);
     M[2] = c_scale(s1, -sb);
@@ -443,8 +443,8 @@ __device__ inline void jones_from_s1s2(Complex2 s1, Complex2 s2,
 __device__ inline void apply_jones(const Complex2 M[4],
                                    const Complex2 Ein[2],
                                    Complex2 Eout[2],
-                                   float denom_sqrt) {
-    float inv = 1.0f / denom_sqrt;
+                                   double denom_sqrt) {
+    double inv = 1.0 / denom_sqrt;
     Eout[0] = c_scale(c_add(c_mul(M[0], Ein[0]), c_mul(M[1], Ein[1])), inv);
     Eout[1] = c_scale(c_add(c_mul(M[2], Ein[0]), c_mul(M[3], Ein[1])), inv);
 }
@@ -456,15 +456,15 @@ __device__ inline void apply_jones(const Complex2 M[4],
  * This helper is used when reconstructing the forward/reverse phase difference
  * written into the packet database.
  */
-__device__ inline void optical_lengths_to_surface(float z, float uz,
-                                                  float &L1, float &L2) {
-    L1 = 0.0f;
-    L2 = 0.0f;
-    if (uz == 0.0f) {
+__device__ inline void optical_lengths_to_surface(double z, double uz,
+                                                  double &L1, double &L2) {
+    L1 = 0.0;
+    L2 = 0.0;
+    if (uz == 0.0) {
         return;
     }
 
-    if (uz > 0.0f) {
+    if (uz > 0.0) {
         if (z <= ZMAX_l1) {
             L1 = z / uz;
         } else {
@@ -472,7 +472,7 @@ __device__ inline void optical_lengths_to_surface(float z, float uz,
             L2 = (z - ZMAX_l1) / uz;
         }
     } else {
-        float up = -uz;
+        double up = -uz;
         if (z <= ZMAX_l1) {
             L1 = z / up;
         } else {
@@ -486,11 +486,11 @@ __device__ inline void optical_lengths_to_surface(float z, float uz,
  * @brief Populate one binary output packet prior to writing it back to host.
  */
 __device__ inline void fill_packet(PacketOut &out,
-                                   float etheta_deg,
-                                   float pl_l1,
-                                   float pl_l2,
-                                   float pexit,
-                                   float phase,
+                                   double etheta_deg,
+                                   double pl_l1,
+                                   double pl_l2,
+                                   double pexit,
+                                   double phase,
                                    int nscatt,
                                    const Complex2 Efe[2],
                                    const Complex2 Ere[2],
@@ -554,10 +554,10 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
                                  std::uint64_t seed,
                                  const Complex2 *s1_l1,
                                  const Complex2 *s2_l1,
-                                 const float *cdf_l1,
+                                 const double *cdf_l1,
                                  const Complex2 *s1_l2,
                                  const Complex2 *s2_l2,
-                                 const float *cdf_l2,
+                                 const double *cdf_l2,
                                  PacketOut *records,
                                  unsigned int *record_count,
                                  unsigned int max_records,
@@ -573,17 +573,17 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
     curand_init(seed, global_id, 0ULL, &rng);
 
     // Incident frame attached to the incoming wave before any scattering.
-    Vec3 mi = v_make(1.0f, 0.0f, 0.0f);
-    Vec3 ni = v_make(0.0f, 1.0f, 0.0f);
-    Vec3 si = v_make(0.0f, 0.0f, 1.0f);
+    Vec3 mi = v_make(1.0, 0.0, 0.0);
+    Vec3 ni = v_make(0.0, 1.0, 0.0);
+    Vec3 si = v_make(0.0, 0.0, 1.0);
 
-    float itheta = ANGLEI_DEG * PI / 180.0f;
-    float iphi = 0.0f;
+    double itheta = ANGLEI_DEG * PI / 180.0;
+    double iphi = 0.0;
     rotate_ref_frame(mi, ni, si, itheta, iphi);
 
     Complex2 Ei[2];
-    Ei[0] = c_make(1.0f / sqrtf(2.0f), 0.0f);
-    Ei[1] = c_make(0.0f, -1.0f / sqrtf(2.0f));
+    Ei[0] = c_make(1.0 / sqrt(2.0), 0.0);
+    Ei[1] = c_make(0.0, -1.0 / sqrt(2.0));
 
     Complex2 E[2] = {Ei[0], Ei[1]};
     Vec3 m = mi;
@@ -594,42 +594,42 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
     Complex2 Mprev[4];
     Complex2 Mf0[4];
     for (int i = 0; i < 4; ++i) {
-        Mfwd[i] = c_make(0.0f, 0.0f);
-        Mprev[i] = c_make(0.0f, 0.0f);
-        Mf0[i] = c_make(0.0f, 0.0f);
+        Mfwd[i] = c_make(0.0, 0.0);
+        Mprev[i] = c_make(0.0, 0.0);
+        Mf0[i] = c_make(0.0, 0.0);
     }
-    Mfwd[0] = c_make(1.0f, 0.0f);
-    Mfwd[3] = c_make(1.0f, 0.0f);
-    Mprev[0] = c_make(1.0f, 0.0f);
-    Mprev[3] = c_make(1.0f, 0.0f);
+    Mfwd[0] = c_make(1.0, 0.0);
+    Mfwd[3] = c_make(1.0, 0.0);
+    Mprev[0] = c_make(1.0, 0.0);
+    Mprev[3] = c_make(1.0, 0.0);
 
-    float rr = curand_uniform(&rng);
-    float etheta = PI - rr * RANGE_DEG * PI / 180.0f;
+    double rr = curand_uniform_double(&rng);
+    double etheta = PI - rr * RANGE_DEG * PI / 180.0;
 
     Vec3 me = mi;
     Vec3 ne = ni;
     Vec3 se = si;
-    Vec3 se0 = v_scale(si, -1.0f);
-    rotate_ref_frame(me, ne, se, etheta, 0.0f);
+    Vec3 se0 = v_scale(si, -1.0);
+    rotate_ref_frame(me, ne, se, etheta, 0.0);
 
-    rr = curand_uniform(&rng);
-    float ephi = 2.0f * PI * rr;
+    rr = curand_uniform_double(&rng);
+    double ephi = 2.0 * PI * rr;
     // Rotate about the backscatter axis se0.
     rodrigues(se0, ephi, me);
     rodrigues(se0, ephi, ne);
     rodrigues(se0, ephi, se);
-    float ephi1 = atan2f(se.y, se.x);
+    double ephi1 = atan2(se.y, se.x);
 
-    float dx = si.x;
-    float dy = si.y;
-    float dz = si.z;
-    float x = 0.0f;
-    float y = 0.0f;
-    float z = 0.0f;
+    double dx = si.x;
+    double dy = si.y;
+    double dz = si.z;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
     int nscatt = 0;
-    float pl_l1 = 0.0f;
-    float pl_l2 = 0.0f;
-    float pbeta_prev = 1.0f;
+    double pl_l1 = 0.0;
+    double pl_l2 = 0.0;
+    double pbeta_prev = 1.0;
 
     Vec3 mold = mi;
     Vec3 nold = ni;
@@ -639,63 +639,63 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
     Vec3 m1 = mi;
     Vec3 n1 = ni;
     Vec3 s1 = si;
-    float x1 = 0.0f, y1 = 0.0f, z1 = 0.0f;
+    double x1 = 0.0, y1 = 0.0, z1 = 0.0;
 
     for (int scatter_iter = 0; scatter_iter < MAX_SCATTER; ++scatter_iter) {
         const Complex2 *s1_tab = nullptr;
         const Complex2 *s2_tab = nullptr;
-        const float *cdf = nullptr;
-        float scoeff = 0.0f;
-        float ssa = 0.0f;
-        float nmed = 0.0f;
+        const double *cdf = nullptr;
+        double scoeff = 0.0;
+        double ssa = 0.0;
+        double nmed = 0.0;
         select_layer_tables(z, s1_l1, s2_l1, cdf_l1, s1_l2, s2_l2, cdf_l2,
                             s1_tab, s2_tab, cdf, scoeff, ssa, nmed);
 
         // Exponential free-path sampling with layer-specific scattering
         // coefficient. Units are meters because scoeff is in 1/m.
-        rr = curand_uniform(&rng);
-        rr = (rr == 0.0f) ? 1.0e-16f : rr;
-        float dl = logf(1.0f / rr) / scoeff;
+        rr = curand_uniform_double(&rng);
+        rr = (rr == 0.0) ? 1.0e-16 : rr;
+        double dl = log(1.0 / rr) / scoeff;
 
         // Before applying the move, check whether the sampled free path would
         // carry the photon out of the top surface. If so, compute one database
         // record representing that escape contribution.
-        if (nscatt > 0 && z + dl * se.z < 0.0f) {
-            float dxrot = dot3(se, mold);
-            float dyrot = dot3(se, nold);
-            float dzrot = dot3(se, sold);
-            float beta = atan2f(dyrot, dxrot);
-            float alpha = acosf(clampd(dzrot, -1.0f, 1.0f));
+        if (nscatt > 0 && z + dl * se.z < 0.0) {
+            double dxrot = dot3(se, mold);
+            double dyrot = dot3(se, nold);
+            double dzrot = dot3(se, sold);
+            double beta = atan2(dyrot, dxrot);
+            double alpha = acos(clampd(dzrot, -1.0, 1.0));
 
             Vec3 mef = mold;
             Vec3 nef = nold;
             Vec3 sef = sold;
             rotate_ref_frame(mef, nef, sef, alpha, beta);
-            Vec3 rot_axis = v_make(sinf(ephi1), -cosf(ephi1), 0.0f);
-            rodrigues(rot_axis, 0.0f, mef);
-            rodrigues(rot_axis, 0.0f, nef);
-            rodrigues(rot_axis, 0.0f, sef);
+            Vec3 rot_axis = v_make(sin(ephi1), -cos(ephi1), 0.0);
+            rodrigues(rot_axis, 0.0, mef);
+            rodrigues(rot_axis, 0.0, nef);
+            rodrigues(rot_axis, 0.0, sef);
 
             Complex2 iS1, iS2;
             interp_s1s2(alpha, s1_tab, s2_tab, iS1, iS2);
-            float S11 = 0.5f * (c_abs2(iS2) + c_abs2(iS1));
-            float S12 = 0.5f * (c_abs2(iS2) - c_abs2(iS1));
-            float SI = c_abs2(Eold[0]) + c_abs2(Eold[1]);
-            float SQ = c_abs2(Eold[0]) - c_abs2(Eold[1]);
-            float SU = 2.0f * (Eold[0].re * Eold[1].re + Eold[0].im * Eold[1].im);
-            float pexit = S11 * SI + S12 * (SQ * cosf(2.0f * beta) + SU * sinf(2.0f * beta));
+            double S11 = 0.5 * (c_abs2(iS2) + c_abs2(iS1));
+            double S12 = 0.5 * (c_abs2(iS2) - c_abs2(iS1));
+            double SI = c_abs2(Eold[0]) + c_abs2(Eold[1]);
+            double SQ = c_abs2(Eold[0]) - c_abs2(Eold[1]);
+            double SU = 2.0 * (Eold[0].re * Eold[1].re + Eold[0].im * Eold[1].im);
+            double pexit = S11 * SI + S12 * (SQ * cos(2.0 * beta) + SU * sin(2.0 * beta));
 
             Complex2 Mfn[4];
             jones_from_s1s2(iS1, iS2, beta, Mfn);
 
             if (nscatt > 1) {
-                float xn = x;
-                float yn = y;
-                float zn = z;
+                double xn = x;
+                double yn = y;
+                double zn = z;
 
                 Complex2 Q[4] = {
-                    c_make(1.0f, 0.0f), c_make(0.0f, 0.0f),
-                    c_make(0.0f, 0.0f), c_make(-1.0f, 0.0f)
+                    c_make(1.0, 0.0), c_make(0.0, 0.0),
+                    c_make(0.0, 0.0), c_make(-1.0, 0.0)
                 };
                 Complex2 MfwdT[4] = {Mfwd[0], Mfwd[2], Mfwd[1], Mfwd[3]};
                 Complex2 Mp[4], Mrev[4], Mpp[4];
@@ -705,8 +705,8 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
                 dxrot = -dot3(sold, mi);
                 dyrot = -dot3(sold, ni);
                 dzrot = -dot3(sold, si);
-                beta = atan2f(dyrot, dxrot);
-                alpha = acosf(clampd(dzrot, -1.0f, 1.0f));
+                beta = atan2(dyrot, dxrot);
+                alpha = acos(clampd(dzrot, -1.0, 1.0));
 
                 Vec3 mrot = mi;
                 Vec3 nrot = ni;
@@ -716,36 +716,36 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
                 Complex2 Mrn[4];
                 jones_from_s1s2(iS1, iS2, beta, Mrn);
 
-                float cos_beta1 = clampd(dot3(mold, mrot), -1.0f, 1.0f);
-                float beta1 = acosf(cos_beta1);
-                if (acosf(clampd(dot3(mold, nrot), -1.0f, 1.0f)) > 0.5f * PI) {
-                    beta1 = 2.0f * PI - beta1;
+                double cos_beta1 = clampd(dot3(mold, mrot), -1.0, 1.0);
+                double beta1 = acos(cos_beta1);
+                if (acos(clampd(dot3(mold, nrot), -1.0, 1.0)) > 0.5 * PI) {
+                    beta1 = 2.0 * PI - beta1;
                 }
                 Complex2 Rbeta1[4] = {
-                    c_make(cosf(beta1), 0.0f), c_make(sinf(beta1), 0.0f),
-                    c_make(-sinf(beta1), 0.0f), c_make(cosf(beta1), 0.0f)
+                    c_make(cos(beta1), 0.0), c_make(sin(beta1), 0.0),
+                    c_make(-sin(beta1), 0.0), c_make(cos(beta1), 0.0)
                 };
 
                 dxrot = dot3(se, m1);
                 dyrot = -dot3(se, n1);
                 dzrot = -dot3(se, s1);
-                beta = atan2f(dyrot, dxrot);
-                alpha = acosf(clampd(dzrot, -1.0f, 1.0f));
+                beta = atan2(dyrot, dxrot);
+                alpha = acos(clampd(dzrot, -1.0, 1.0));
 
                 Vec3 mer = m1;
-                Vec3 ner = v_scale(n1, -1.0f);
-                Vec3 ser = v_scale(s1, -1.0f);
+                Vec3 ner = v_scale(n1, -1.0);
+                Vec3 ser = v_scale(s1, -1.0);
                 rotate_ref_frame(mer, ner, ser, alpha, beta);
-                rodrigues(rot_axis, 0.0f, mer);
-                rodrigues(rot_axis, 0.0f, ner);
-                rodrigues(rot_axis, 0.0f, ser);
+                rodrigues(rot_axis, 0.0, mer);
+                rodrigues(rot_axis, 0.0, ner);
+                rodrigues(rot_axis, 0.0, ser);
 
                 const Complex2 *s1_first = nullptr;
                 const Complex2 *s2_first = nullptr;
-                const float *cdf_first = nullptr;
-                float scoeff_first = 0.0f;
-                float ssa_first = 0.0f;
-                float nmed_first = 0.0f;
+                const double *cdf_first = nullptr;
+                double scoeff_first = 0.0;
+                double ssa_first = 0.0;
+                double nmed_first = 0.0;
                 select_layer_tables(z1, s1_l1, s2_l1, cdf_l1, s1_l2, s2_l2, cdf_l2,
                                     s1_first, s2_first, cdf_first,
                                     scoeff_first, ssa_first, nmed_first);
@@ -766,40 +766,40 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
                 Ere[0] = c_add(c_mul(Mre[0], Ei[0]), c_mul(Mre[1], Ei[1]));
                 Ere[1] = c_add(c_mul(Mre[2], Ei[0]), c_mul(Mre[3], Ei[1]));
 
-                float l1si_1, l1si_2;
-                float lnse_1, lnse_2;
-                float lnsi_1, lnsi_2;
-                float l1se_1, l1se_2;
+                double l1si_1, l1si_2;
+                double lnse_1, lnse_2;
+                double lnsi_1, lnsi_2;
+                double l1se_1, l1se_2;
                 optical_lengths_to_surface(z1, si.z, l1si_1, l1si_2);
                 optical_lengths_to_surface(zn, se.z, lnse_1, lnse_2);
                 optical_lengths_to_surface(zn, si.z, lnsi_1, lnsi_2);
                 optical_lengths_to_surface(z1, se.z, l1se_1, l1se_2);
 
-                float lnse = (zn / -se.z);
-                float xef = xn + se.x * lnse;
-                float yef = yn + se.y * lnse;
-                float zef = zn + se.z * lnse;
-                float lnsi = zn / si.z;
-                float xir = xn - si.x * lnsi;
-                float yir = yn - si.y * lnsi;
-                float zir = zn - si.z * lnsi;
-                float l1se = -z1 / se.z;
-                float xer = x1 + se.x * l1se;
-                float yer = y1 + se.y * l1se;
-                float zer = z1 + se.z * l1se;
-                float d1 = sef.x * (xer - xef) + sef.y * (yer - yef) + sef.z * (zer - zef);
-                float d2 = si.x * xir + si.y * yir + si.z * zir;
+                double lnse = (zn / -se.z);
+                double xef = xn + se.x * lnse;
+                double yef = yn + se.y * lnse;
+                double zef = zn + se.z * lnse;
+                double lnsi = zn / si.z;
+                double xir = xn - si.x * lnsi;
+                double yir = yn - si.y * lnsi;
+                double zir = zn - si.z * lnsi;
+                double l1se = -z1 / se.z;
+                double xer = x1 + se.x * l1se;
+                double yer = y1 + se.y * l1se;
+                double zer = z1 + se.z * l1se;
+                double d1 = sef.x * (xer - xef) + sef.y * (yer - yef) + sef.z * (zer - zef);
+                double d2 = si.x * xir + si.y * yir + si.z * zir;
 
-                float optical_diff = NMED_l1 * (l1si_1 + lnse_1 - lnsi_1 - l1se_1)
+                double optical_diff = NMED_l1 * (l1si_1 + lnse_1 - lnsi_1 - l1se_1)
                                     + NMED_l2 * (l1si_2 + lnse_2 - lnsi_2 - l1se_2);
-                float phase = (2.0f * PI / LAMBDA) * (optical_diff + d1 - d2);
+                double phase = (2.0 * PI / LAMBDA) * (optical_diff + d1 - d2);
 
                 // Reserve a record slot atomically because many GPU threads
                 // can discover valid escape contributions concurrently.
                 unsigned int slot = atomicAdd(record_count, 1U);
                 if (slot < max_records) {
                     fill_packet(records[slot],
-                                (PI - etheta) * 180.0f / PI,
+                                (PI - etheta) * 180.0 / PI,
                                 pl_l1,
                                 pl_l2,
                                 pexit,
@@ -823,11 +823,11 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
                 unsigned int slot = atomicAdd(record_count, 1U);
                 if (slot < max_records) {
                     fill_packet(records[slot],
-                                (PI - etheta) * 180.0f / PI,
+                                (PI - etheta) * 180.0 / PI,
                                 pl_l1,
                                 pl_l2,
                                 pexit,
-                                0.0f,
+                                0.0,
                                 nscatt,
                                 Eout,
                                 Eout,
@@ -845,9 +845,9 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
 
         // Apply the sampled move now that any top-surface contribution has
         // been recorded.
-        float xnew = x + dl * dx;
-        float ynew = y + dl * dy;
-        float znew = z + dl * dz;
+        double xnew = x + dl * dx;
+        double ynew = y + dl * dy;
+        double znew = z + dl * dz;
 
         if (z < ZMAX_l1) {
             pl_l1 += dl;
@@ -859,11 +859,11 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
         y = ynew;
         z = znew;
 
-        if (z < 0.0f || z > ZMAX_total) {
+        if (z < 0.0 || z > ZMAX_total) {
             break;
         }
 
-        rr = curand_uniform(&rng);
+        rr = curand_uniform_double(&rng);
         if (rr > ssa) {
             break;
         }
@@ -871,7 +871,7 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
         if (nscatt > 1) {
             Complex2 Mp[4];
             matrix_multiply_2x2(Mprev, Mfwd, Mp);
-            float inv = 1.0f / sqrtf(fmaxf(pbeta_prev, 1.0e-30f));
+            double inv = 1.0 / sqrt(fmax(pbeta_prev, 1.0e-300));
             for (int i = 0; i < 4; ++i) {
                 Mfwd[i] = c_scale(Mp[i], inv);
             }
@@ -879,30 +879,30 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
 
         // Sample the next scattering deflection alpha from the precomputed
         // CDF for the active layer.
-        rr = curand_uniform(&rng);
+        rr = curand_uniform_double(&rng);
         int ibin = find_alpha_bin(rr, cdf);
-        float denom = cdf[ibin + 1] - cdf[ibin];
-        float frac = (denom > 0.0f) ? (rr - cdf[ibin]) / denom : 0.0f;
-        frac = clampd(frac, 0.0f, 1.0f);
-        float alpha = (static_cast<float>(ibin) + frac) * PI / 180.0f;
+        double denom = cdf[ibin + 1] - cdf[ibin];
+        double frac = (denom > 0.0) ? (rr - cdf[ibin]) / denom : 0.0;
+        frac = clampd(frac, 0.0, 1.0);
+        double alpha = (static_cast<double>(ibin) + frac) * PI / 180.0;
 
         Complex2 iS1, iS2;
         interp_s1s2(alpha, s1_tab, s2_tab, iS1, iS2);
-        float S11 = 0.5f * (c_abs2(iS2) + c_abs2(iS1));
-        float S12 = 0.5f * (c_abs2(iS2) - c_abs2(iS1));
-        float SI = c_abs2(E[0]) + c_abs2(E[1]);
-        float SQ = c_abs2(E[0]) - c_abs2(E[1]);
-        float SU = 2.0f * (E[0].re * E[1].re + E[0].im * E[1].im);
-        float ptheta = 2.0f * PI * S11;
+        double S11 = 0.5 * (c_abs2(iS2) + c_abs2(iS1));
+        double S12 = 0.5 * (c_abs2(iS2) - c_abs2(iS1));
+        double SI = c_abs2(E[0]) + c_abs2(E[1]);
+        double SQ = c_abs2(E[0]) - c_abs2(E[1]);
+        double SU = 2.0 * (E[0].re * E[1].re + E[0].im * E[1].im);
+        double ptheta = 2.0 * PI * S11;
 
         // Sample the azimuth beta using rejection sampling conditioned on the
         // current polarization state.
-        float pcond = -1.0f;
-        float beta = 0.0f;
-        float pbeta = 1.0f;
-        while (pcond < curand_uniform(&rng)) {
-            beta = 2.0f * PI * curand_uniform(&rng);
-            pbeta = S11 * SI + S12 * (SQ * cosf(2.0f * beta) + SU * sinf(2.0f * beta));
+        double pcond = -1.0;
+        double beta = 0.0;
+        double pbeta = 1.0;
+        while (pcond < curand_uniform_double(&rng)) {
+            beta = 2.0 * PI * curand_uniform_double(&rng);
+            pbeta = S11 * SI + S12 * (SQ * cos(2.0 * beta) + SU * sin(2.0 * beta));
             pcond = pbeta / ptheta;
         }
         pbeta_prev = pbeta;
@@ -923,7 +923,7 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
         // propagation frame to the new direction.
         jones_from_s1s2(iS1, iS2, beta, Mprev);
         Complex2 Enew[2];
-        apply_jones(Mprev, E, Enew, sqrtf(fmaxf(pbeta, 1.0e-30f)));
+        apply_jones(Mprev, E, Enew, sqrt(fmax(pbeta, 1.0e-300)));
         E[0] = Enew[0];
         E[1] = Enew[1];
 
@@ -947,10 +947,10 @@ __global__ void transport_kernel(std::uint64_t photon_offset,
  *
  * The input text file is expected to contain one row per degree with columns
  *   angle_deg  Re(S1)  Im(S1)  Re(S2)  Im(S2)
- * After reading, the amplitudes are normalized by sqrtf(pi * Qxx) and the CDF
+ * After reading, the amplitudes are normalized by sqrt(pi * Qxx) and the CDF
  * used for alpha sampling is constructed from the tabulated differential power.
  */
-HostScatteringTable load_scattering_table(const char *path, float qxx) {
+HostScatteringTable load_scattering_table(const char *path, double qxx) {
     HostScatteringTable table;
     table.sca_deg.resize(ANGLES);
     table.s1.resize(ANGLES);
@@ -962,29 +962,29 @@ HostScatteringTable load_scattering_table(const char *path, float qxx) {
         throw std::runtime_error(std::string("Failed to open scattering file: ") + path);
     }
 
-    float sum = 0.0f;
+    double sum = 0.0;
     for (int i = 0; i < ANGLES; ++i) {
-        float reS1, imS1, reS2, imS2;
-        if (std::fscanf(fp, "%f %f %f %f %f", &table.sca_deg[i], &reS1, &imS1, &reS2, &imS2) != 5) {
+        double reS1, imS1, reS2, imS2;
+        if (std::fscanf(fp, "%lf %lf %lf %lf %lf", &table.sca_deg[i], &reS1, &imS1, &reS2, &imS2) != 5) {
             std::fclose(fp);
             throw std::runtime_error(std::string("Malformed scattering file: ") + path);
         }
-        float norm = sqrtf(PI * qxx);
+        double norm = sqrt(PI * qxx);
         table.s1[i] = c_make(reS1 / norm, imS1 / norm);
         table.s2[i] = c_make(reS2 / norm, imS2 / norm);
-        float ptheta = PI * (c_abs2(table.s2[i]) + c_abs2(table.s1[i]));
-        sum += ptheta * sinf(static_cast<float>(i) * PI / 180.0f);
+        double ptheta = PI * (c_abs2(table.s2[i]) + c_abs2(table.s1[i]));
+        sum += ptheta * sin(static_cast<double>(i) * PI / 180.0);
         table.cdf[i] = sum;
     }
     std::fclose(fp);
 
-    if (sum <= 0.0f) {
+    if (sum <= 0.0) {
         throw std::runtime_error(std::string("Degenerate scattering CDF for file: ") + path);
     }
     for (int i = 0; i < ANGLES; ++i) {
         table.cdf[i] /= sum;
     }
-    table.cdf[ANGLES - 1] = 1.0f;
+    table.cdf[ANGLES - 1] = 1.0;
     return table;
 }
 
@@ -996,17 +996,17 @@ void copy_tables_to_device(const HostScatteringTable &l1,
                            DeviceTables &dt) {
     CUDA_CHECK(cudaMalloc(&dt.s1_l1, ANGLES * sizeof(Complex2)));
     CUDA_CHECK(cudaMalloc(&dt.s2_l1, ANGLES * sizeof(Complex2)));
-    CUDA_CHECK(cudaMalloc(&dt.cdf_l1, ANGLES * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&dt.cdf_l1, ANGLES * sizeof(double)));
     CUDA_CHECK(cudaMalloc(&dt.s1_l2, ANGLES * sizeof(Complex2)));
     CUDA_CHECK(cudaMalloc(&dt.s2_l2, ANGLES * sizeof(Complex2)));
-    CUDA_CHECK(cudaMalloc(&dt.cdf_l2, ANGLES * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&dt.cdf_l2, ANGLES * sizeof(double)));
 
     CUDA_CHECK(cudaMemcpy(dt.s1_l1, l1.s1.data(), ANGLES * sizeof(Complex2), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(dt.s2_l1, l1.s2.data(), ANGLES * sizeof(Complex2), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(dt.cdf_l1, l1.cdf.data(), ANGLES * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(dt.cdf_l1, l1.cdf.data(), ANGLES * sizeof(double), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(dt.s1_l2, l2.s1.data(), ANGLES * sizeof(Complex2), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(dt.s2_l2, l2.s2.data(), ANGLES * sizeof(Complex2), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(dt.cdf_l2, l2.cdf.data(), ANGLES * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(dt.cdf_l2, l2.cdf.data(), ANGLES * sizeof(double), cudaMemcpyHostToDevice));
 }
 
 /** @brief Release all device table allocations. */

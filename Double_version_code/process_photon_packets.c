@@ -15,10 +15,8 @@
 
 /*
  * This reducer is adapted to the CUDA packet layout defined in
- * output_photon_packet_structure.h. The packet fields are single precision
- * on disk to match run_electric_field_mc_float.cu, then promoted to double
- * for the accumulation math below. It computes the necessary math from the
- * output packets to calculate the coherent summation of backscattered photons.
+ * output_photon_packet_structure.h. It computes the necessary math from the output packets to calculute 
+ * the coherent summation of backscattered photons.
  */
 
 /* Compute product = first x second */
@@ -55,7 +53,7 @@ static double dot3_arr(const double a[3], const double b[3])
     return dot_product;
 }
 
-/* Convert explicit float packet complex storage to C double complex. */
+/* Convert explicit packet complex storage to C double complex. */
 static inline double complex c_from_packet(Complex2 z)
 {
     return z.re + I * z.im;
@@ -112,7 +110,6 @@ int main(int argc, char **argv)
     printf("Reading packet database: %s\n", input_path);
     printf("Writing reduced output to: %s\n", output_path);
     printf("Progress update interval: every %llu records\n", progress_interval);
-    printf("PacketOut record size: %zu bytes\n", sizeof(PacketOut));
     fflush(stdout);
 
     while (fread(&op, sizeof(PacketOut), 1, fp) == 1)

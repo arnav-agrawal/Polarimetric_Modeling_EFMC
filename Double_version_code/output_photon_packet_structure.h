@@ -4,8 +4,6 @@
  *
  * Both the GPU transport code and any later post-processing code must include
  * this header so they agree on the exact byte layout written to disk.
- *
- * Float version: this layout matches run_electric_field_mc_float.cu.
  */
 
 #ifndef EFMC_PACKET_LAYOUT_H
@@ -19,8 +17,8 @@ extern "C" {
 
 /** @brief Plain real/imaginary complex-number storage used in packets. */
 typedef struct {
-    float re;
-    float im;
+    double re;
+    double im;
 } Complex2;
 
 /**
@@ -37,42 +35,27 @@ typedef struct {
  * Efe    : forward electric field (2 transverse components)
  * Ere    : reverse-path electric field (2 transverse components)
  * mef...ser : basis vectors needed to rotate the fields into a common frame
- *
- * Binary layout note
- * ------------------
- * This structure is written verbatim by run_electric_field_mc_float.cu.
- * Do not change field order, field type, or padding unless the writer is
- * changed at the same time.
  */
 typedef struct {
-    float etheta;
-    float pl_l1;
-    float pl_l2;
-    float pexit;
-    float phase;
+    double etheta;
+    double pl_l1;
+    double pl_l2;
+    double pexit;
+    double phase;
     int nscatt;
     int _pad;
     Complex2 Efe[2];
     Complex2 Ere[2];
-    float mef[3];
-    float nef[3];
-    float sef[3];
-    float mer[3];
-    float ner[3];
-    float ser[3];
+    double mef[3];
+    double nef[3];
+    double sef[3];
+    double mer[3];
+    double ner[3];
+    double ser[3];
 } PacketOut;
 
 #ifdef __cplusplus
 }
-#endif
-
-/* The CUDA float writer emits 132-byte PacketOut records on the target layout. */
-#if defined(__cplusplus)
-static_assert(sizeof(Complex2) == 2 * sizeof(float), "Complex2 layout mismatch");
-static_assert(sizeof(PacketOut) == 132, "PacketOut float layout mismatch");
-#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
-_Static_assert(sizeof(Complex2) == 2 * sizeof(float), "Complex2 layout mismatch");
-_Static_assert(sizeof(PacketOut) == 132, "PacketOut float layout mismatch");
 #endif
 
 #endif
